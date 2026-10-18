@@ -614,7 +614,7 @@ function viewUs() {
   const days = dated.length ? Math.round((new Date(today()) - new Date(dated[0])) / 864e5) + 1 : 0;
   const bios = {
     dhruv: 'Gujarati through and through',
-    sohini: 'Bengali through and through, grew up in Bengal',
+    sohini: 'Bengali through and through',
   };
   return `
     <section class="us-hero">
