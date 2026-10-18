@@ -11,6 +11,8 @@ const PHRASES = 'data/phrases.enc';
 let key = null;
 let token = null;
 let phrasesSha = null;
+let phrasesEtag = null;
+let siteIv = null;
 const blobCache = new Map();
 
 export function setKey(k) { key = k; }
@@ -59,17 +61,30 @@ export async function testToken(t) {
   return { ok: true };
 }
 
-export async function loadPhrases() {
+// With onlyIfChanged, resolves to null when nothing changed since the last load.
+// Conditional (ETag) requests that come back 304 don't count against GitHub's rate limit.
+export async function loadPhrases(onlyIfChanged = false) {
   if (token) {
     try {
-      const j = await apiGetJSON(PHRASES);
+      const h = headers({ Accept: 'application/vnd.github+json' });
+      if (onlyIfChanged && phrasesEtag) h['If-None-Match'] = phrasesEtag;
+      const r = await fetch(`${API}${PHRASES}?ref=${BRANCH}`, { headers: h, cache: 'no-store' });
+      if (r.status === 304) return null;
+      if (!r.ok) throw new Error(`GitHub said ${r.status}`);
+      phrasesEtag = r.headers.get('ETag');
+      const j = await r.json();
+      if (onlyIfChanged && j.sha === phrasesSha) return null;
       phrasesSha = j.sha;
       return (await decryptJSON(key, b64ToBytes(j.content))).phrases;
     } catch (e) {
       console.warn('API read failed, falling back to site copy', e);
     }
   }
-  return (await decryptJSON(key, await siteGet(PHRASES))).phrases;
+  const enc = await siteGet(PHRASES);
+  const iv = bytesToB64(enc.subarray(0, 12)); // a fresh IV on every save, so it doubles as a version
+  if (onlyIfChanged && iv === siteIv) return null;
+  siteIv = iv;
+  return (await decryptJSON(key, enc)).phrases;
 }
 
 // Read-modify-write with retry, so two phones saving at once don't clobber each other.

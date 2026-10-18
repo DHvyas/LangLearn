@@ -350,9 +350,62 @@ async function reload() {
   S.loadedAt = Date.now();
 }
 
-document.addEventListener('visibilitychange', async () => {
-  if (document.visibilityState !== 'visible' || !S.me || Date.now() - S.loadedAt < 30000) return;
-  try { await reload(); refreshAll(); } catch {}
+// ---------- live sync: check for the other phone's changes while the app is open ----------
+
+const SYNC_MS = 15000;
+let syncing = false;
+let pendingRefresh = false;
+const typing = () => /^(INPUT|TEXTAREA)$/.test(document.activeElement?.tagName || '');
+
+async function sync() {
+  if (syncing || !S.me || !S.phrases.length || document.visibilityState !== 'visible') return;
+  syncing = true;
+  try {
+    const fresh = await store.loadPhrases(true);
+    if (fresh) {
+      const news = whatsNew(S.phrases, fresh);
+      S.phrases = fresh;
+      S.loadedAt = Date.now();
+      if (typing()) pendingRefresh = true;
+      else refreshAll();
+      if (news) { toast(news, 4000); vibrate([15, 60, 15]); }
+    }
+  } catch (e) {
+    console.warn('sync failed', e);
+  } finally {
+    syncing = false;
+  }
+}
+
+// A one-line heads-up about what the partner just did, e.g. "Sohini added a new phrase 💌".
+function whatsNew(before, after) {
+  const partner = other(S.me), name = PEOPLE[partner].name;
+  const old = new Map(before.map((p) => [p.id, p]));
+  const msgs = [];
+  for (const p of after) {
+    const o = old.get(p.id);
+    if (!o) { if (p.addedBy === partner) msgs.push(`${name} added "${p.english}" 💌`); continue; }
+    const lang = PEOPLE[partner].native;
+    if (p[lang]?.roman && !o[lang]?.roman) msgs.push(`${name} added the ${LANGS[lang].name} for "${p.english}" ✍️`);
+    if (p.audio?.[lang] && p.audio[lang].at !== o.audio?.[lang]?.at) msgs.push(`${name} recorded "${p.english}" 🎧`);
+    const oldTries = new Map((o.attempts || []).map((a) => [a.id, a]));
+    for (const a of p.attempts || []) {
+      const oa = oldTries.get(a.id);
+      if (!oa && a.by === partner) msgs.push(`${name} tried saying "${p.english}" 🗣️`);
+      if (oa && a.by === S.me && a.reaction && !oa.reaction) msgs.push(a.reaction === 'shabash' ? `${name} says Shabash! 🎉` : `${name} says: try again 🔁`);
+    }
+  }
+  if (!msgs.length) return '';
+  return msgs.length === 1 ? msgs[0] : `${msgs[0]} (+${msgs.length - 1} more)`;
+}
+
+setInterval(sync, SYNC_MS);
+document.addEventListener('visibilitychange', sync);
+window.addEventListener('pageshow', sync);
+window.addEventListener('online', sync);
+document.addEventListener('focusout', () => {
+  if (!pendingRefresh) return;
+  setTimeout(() => { if (!typing() && pendingRefresh) { pendingRefresh = false; refreshAll(); } }, 0);
 });
 
 // ---------- shell ----------
