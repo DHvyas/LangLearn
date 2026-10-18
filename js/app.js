@@ -613,13 +613,13 @@ function viewUs() {
   const dated = S.phrases.filter((p) => p.date).map((p) => p.date).sort();
   const days = dated.length ? Math.round((new Date(today()) - new Date(dated[0])) / 864e5) + 1 : 0;
   const bios = {
-    dhruv: 'Gujarati at heart, grew up in Kuwait',
+    dhruv: 'Gujarati through and through',
     sohini: 'Bengali through and through, grew up in Bengal',
   };
   return `
     <section class="us-hero">
       <figure class="polaroid big" data-act="photo" data-photo-name="us">${photo('us')}<figcaption>Dhruv &amp; Sohini</figcaption></figure>
-      <p class="us-line">One Gujarati from Kuwait. One Bengali from Bengal.<br><span>In Bengali, love is <i>bhalobasha</i>: literally a good place to live.</span></p>
+      <p class="us-line">One Gujarati. One Bengali.<br><span>In Bengali, love is <i>bhalobasha</i>: literally a good place to live.</span></p>
       ${days ? `<p class="muted center">${days} day${days > 1 ? 's' : ''} of learning each other's languages</p>` : ''}
     </section>
     <section class="people">
