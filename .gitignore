@@ -1,0 +1,5 @@
+private/
+*.jpg
+*.jpeg
+*.heic
+node_modules/
